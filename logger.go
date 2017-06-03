@@ -6,6 +6,13 @@ import (
 )
 
 type logger interface {
+  // These functions are wrappers for the `fmt` functions, but manipulate the
+  // history of the logger.
+  Print(args ...interface{}) *Message
+  // Println(args ...interface{}) *Message
+  Printf(format *string, args ...interface{}) *Message
+  // The following functions add a prefix to the messages that are printed to
+  // the terminal.
   Fatal(args ...interface{}) *Message
   Fatalf(format *string, args ...interface{}) *Message
   Error(args ...interface{}) *Message
@@ -16,6 +23,8 @@ type logger interface {
   Infof(format *string, args ...interface{}) *Message
   Debug(args ...interface{}) *Message
   Debugf(format *string, args ...interface{}) *Message
+
+  Find(arg interface{}) (int, *Message)
   // Definitions for `Status` are found in `status.go`
   Status()
   // Definitions for `Prompt` and `Promptf` are found in `reader.go`
@@ -54,6 +63,7 @@ func New(level MessageType) *Logger {
 func (l *Logger) log(t MessageType, format *string, args ...interface{}) *Message {
   // Create a new message and add it to the history.
   msg := NewMessage(t, format, args...)
+
   l.history.PostMessage(msg)
 
   // Write the message.
@@ -65,9 +75,113 @@ func (l *Logger) log(t MessageType, format *string, args ...interface{}) *Messag
   return msg
 }
 
+// The `Find` function accepts either an integer, representing an "offset" from
+// the last log item to be posted to the log history, or a pointer to a
+// message, returned from another command which prints a message to the
+// terminal.
+// It then returns a pointer to a message in the log, and can confirm that a message passed to the function is in the log, or
+func (l *Logger) Find(arg interface{}) *Message {
+  msgs := l.history.messages
+
+  switch a := arg.(type) {
+  case *Message:
+    for _, m := range msgs {
+      if a == m {
+        return m
+      }
+    }
+  case int:
+    if a < 0 {
+      a = a * -1
+    }
+
+    if a >= len(msgs) {
+      return msgs[len(msgs) - 1]
+    } else {
+      return msgs[a]
+    }
+  }
+
+  return nil
+}
+
+// The `Modify` function updates the log messages that have previously been printed to the log. By passing either a pointer to a message or an integer representing the index of the message,
+// it returns the number of lines from the bottom of the log to the start of the message, as well as the pointer to the message in the log. If no message matching the pointer to the message is found, the function returns zero and a nil pointer.
+func (l *Logger) Modify(arg interface{}) {
+  var offset int
+  var msg *Message
+
+  msgs := l.history.messages
+
+  // Count the number of lines from the bottom of the log. We can either use
+  // the pointer to the message itself, or an integer representing the index of
+  // the message.
+  switch a := arg.(type) {
+  case *Message:
+    offset = 0
+    msg = a
+    for i := len(msgs) - 1; i >= 0; i-- {
+      offset = offset + msgs[i].lineLength
+      if a == msgs[i] {
+        // index = i
+        break
+      }
+    }
+  case int:
+    for i := 0; i < len(msgs); i++ {
+      offset = offset + msgs[i].lineLength
+      if a == i {
+        msg = msgs[i]
+        // index = i
+        break
+      }
+    }
+  default:
+    offset = 1
+  }
+
+  if msg == nil {
+    offset = 1
+  }
+
+  ll := msg.lineLength
+
+  term.SaveCursorPosition()
+  term.MoveToBeginning()
+  term.MoveUp(offset)
+
+  // Write the message.
+  l.Writer.WriteMessage(msg)
+
+  // We include a newline for all log messages.
+  fmt.Print("\n")
+
+  // If the new message length is longer than the previous line length, we need
+  // to rewrite the log from here down, effectively adding a new line in the
+  // middle of the log.
+  if msg.lineLength > ll {
+    for i := 0; i < len(l.history.messages); i++ {
+      l.Writer.WriteMessage(l.history.messages[i])
+      fmt.Print("\n")
+    }
+  }
+
+  term.RestoreCursorPosition()
+}
+
 // The following functions are the standard functions for interacting with the
 // logger. We have functions for each message type, and special conditions when
 // we have an error.
+func (l *Logger) Print(args ...interface{}) (msg *Message) {
+  msg = l.log(PRINT, nil, args...)
+  return
+}
+
+func (l *Logger) Printf(format string, args ...interface{}) (msg *Message) {
+  msg = l.log(PRINT, &format, args...)
+  return
+}
+
 func (l *Logger) Fatal(args ...interface{}) (msg *Message) {
   msg = l.log(FATAL, nil, args...)
   os.Exit(1)
@@ -129,6 +243,14 @@ var std = New(DEBUG)
 // Methods for calling the default 'std' logger. These are exported and
 // available for use by importing the package in another file. This effectively
 // makes the logger global.
+func Print(args ...interface{}) (msg *Message) {
+  return std.Print(args...)
+}
+
+func Printf(format string, args ...interface{}) (msg *Message) {
+  return std.Printf(format, args...)
+}
+
 func Fatal(args ...interface{}) (msg *Message) {
   return std.Fatal(args...)
 }

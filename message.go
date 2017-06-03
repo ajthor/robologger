@@ -8,7 +8,7 @@ import (
 type MessageType int
 
 const (
-  DEFAULT MessageType = iota
+  PRINT MessageType = iota
   FATAL
   ERROR
   WARN
@@ -28,6 +28,12 @@ type Message struct {
   Type MessageType
   Format *string
   Args []interface{}
+  // The `line` property refers to the line in the terminal that the message is
+  // on. We update this every time we add a message to the history.
+  line int
+  // The `lineLength` property refers to the "size" of the printed message,
+  // i.e. how many lines it takes up on the screen.
+  lineLength int
 }
 
 // The `String` function is an implementation of the `Stringer` interface. The
@@ -70,5 +76,10 @@ func NewMessage(t MessageType, format interface{}, args ...interface{}) *Message
 }
 
 func (m *Message) Append(arg string) {
-  m.Args = append(m.Args, arg)
+  if m.Format != nil {
+    modstr := *m.Format + arg
+    m.Format = &modstr
+  } else {
+    m.Args = append(m.Args, arg)
+  }
 }

@@ -27,7 +27,6 @@ const (
 )
 
 type Reader interface {
-  FormatPrompt(t PromptType, m *Message)
   ParseResponse(response string) (ResponseType, error)
   ReadInput() string
 }
@@ -40,24 +39,6 @@ type ReaderOptions struct {
 
 func NewDefaultReader(opts ReaderOptions) *DefaultReader {
   return &DefaultReader{}
-}
-
-// `FormatPrompt` is very much like the `FormatMessage` function in the
-// `writer.go` file. This function takes the message and converts it into a
-// prompt with the options displayed as selectable choices. It appends the
-// choices to the end of the message, aoiding the need for creating a different
-// type of message.
-func (r *DefaultReader) FormatPrompt(t PromptType, m *Message) {
-  switch t {
-  case YESNO:
-    m.Append(fmt.Sprintf(" [%s]: ", Brown("yN")))
-  case YESNOCANCEL:
-    m.Append(fmt.Sprintf(" [%s]: ", Brown("yNc")))
-  case YESNOCANCELALL:
-    m.Append(fmt.Sprintf(" [%s]: ", Brown("yNca")))
-  default:
-    m.Append(fmt.Sprint(" "))
-  }
 }
 
 // `ParseResponse` takes the input read from `ReadInput` and converts it into
@@ -88,28 +69,28 @@ func (r *DefaultReader) ReadInput() string {
 
 func (l *Logger) prompt(t PromptType, format *string, args ...interface{}) string {
   // Create a new message.
-  msg := NewMessage(DEFAULT, format, args...)
+  msg := NewMessage(PRINT, format, args...)
 
   // Format the message as a prompt.
-  l.Reader.FormatPrompt(t, msg)
+  l.Writer.FormatPrompt(t, msg)
 
   // Write the message.
   l.Writer.WriteMessage(msg)
 
   // Get the input from the user.
   response := l.Reader.ReadInput()
-  l.SaveCursorPosition()
-  l.MoveToBeginning()
-  l.MoveUp(1)
+  term.SaveCursorPosition()
+  term.MoveToBeginning()
+  term.MoveUp(1)
 
-  l.Clear()
+  term.Clear()
 
   l.Writer.WriteMessage(msg)
 
   fmt.Printf("%s", Cyan(response))
   fmt.Print("\n")
 
-  l.RestoreCursorPosition()
+  term.RestoreCursorPosition()
 
   return response
 }
