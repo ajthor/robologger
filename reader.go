@@ -41,6 +41,30 @@ func NewDefaultReader(opts ReaderOptions) *DefaultReader {
   return &DefaultReader{}
 }
 
+// `FormatPrompt` is very much like the `FormatMessage` function. This function
+// takes the message and converts it into a prompt with the options displayed
+// as selectable choices. It appends the choices to the end of the message,
+// avoiding the need for creating a different type of message.
+func (w *DefaultWriter) FormatPrompt(arg interface{}) string {
+  switch a := arg.(type) {
+  case PromptType:
+    switch a {
+    case YESNO:
+      return fmt.Sprintf(" [%s]: ", Brown("yN"))
+    case YESNOCANCEL:
+      return fmt.Sprintf(" [%s]: ", Brown("yNc"))
+    case YESNOCANCELALL:
+      return fmt.Sprintf(" [%s]: ", Brown("yNca"))
+    default:
+      return fmt.Sprint(" ")
+    }
+  default:
+    return fmt.Sprint(a)
+  }
+
+  return ""
+}
+
 // `ParseResponse` takes the input read from `ReadInput` and converts it into
 // a `ResponseType`. This makes checking for a particular response easier.
 func (r *DefaultReader) ParseResponse(response string) (ResponseType, error) {
@@ -67,30 +91,53 @@ func (r *DefaultReader) ReadInput() string {
   return scanner.Text()
 }
 
-func (l *Logger) prompt(t PromptType, format *string, args ...interface{}) string {
+func (l *Logger) prompt(p interface{}, format *string, args ...interface{}) string {
   // Create a new message.
   msg := NewMessage(PRINT, format, args...)
 
   // Format the message as a prompt.
-  l.Writer.FormatPrompt(t, msg)
+  fmsg := l.Writer.FormatPrompt(p)
+
+  msg.Append(fmsg)
 
   // Write the message.
   l.Writer.WriteMessage(msg)
 
   // Get the input from the user.
   response := l.Reader.ReadInput()
-  term.SaveCursorPosition()
+
+  if response == "" {
+    response = "n"
+  }
+  // We need to move up one line here to compensate for the new line entered by
+  // the user.
   term.MoveToBeginning()
   term.MoveUp(1)
+  msg.lineLength = msg.lineLength + 1
 
-  term.Clear()
+  // msg.Append(Cyan(response))
 
   l.Writer.WriteMessage(msg)
+  // l.Modify(msg)
 
   fmt.Printf("%s", Cyan(response))
+
+  // We include a newline for all log messages.
   fmt.Print("\n")
 
-  term.RestoreCursorPosition()
+
+  // term.SaveCursorPosition()
+  // term.MoveToBeginning()
+  // term.MoveUp(1)
+  //
+  // term.Clear()
+  //
+  // l.Writer.WriteMessage(msg)
+  //
+  // fmt.Printf("%s", Cyan(response))
+  // fmt.Print("\n")
+  //
+  // term.RestoreCursorPosition()
 
   return response
 }

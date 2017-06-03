@@ -9,8 +9,9 @@ import (
 
 type Writer interface {
   FormatMessage(m *Message) string
-  FormatPrompt(t PromptType, m *Message)
-  FormatStatus(t StatusType, m *Message)
+  FormatPrompt(arg interface{}) string
+  FormatStatus(arg interface{}) string
+  FormatProgress(progress int, arg interface{}) string
   WriteMessage(m *Message)
 }
 
@@ -50,34 +51,6 @@ func (w *DefaultWriter) FormatMessage(m *Message) string {
   }
 }
 
-// `FormatPrompt` is very much like the `FormatMessage` function. This function
-// takes the message and converts it into a prompt with the options displayed
-// as selectable choices. It appends the choices to the end of the message,
-// avoiding the need for creating a different type of message.
-func (w *DefaultWriter) FormatPrompt(t PromptType, m *Message) {
-  switch t {
-  case YESNO:
-    m.Append(fmt.Sprintf(" [%s]: ", Brown("yN")))
-  case YESNOCANCEL:
-    m.Append(fmt.Sprintf(" [%s]: ", Brown("yNc")))
-  case YESNOCANCELALL:
-    m.Append(fmt.Sprintf(" [%s]: ", Brown("yNca")))
-  default:
-    m.Append(fmt.Sprint(" "))
-  }
-}
-
-func (w *DefaultWriter) FormatStatus(t StatusType, m *Message)  {
-  switch t {
-  case WAITING:
-    m.Append(fmt.Sprintf(" %s", Gray("waiting")))
-  case OK:
-    m.Append(fmt.Sprintf(" %s", Green("ok")))
-  case ERR:
-    m.Append(fmt.Sprintf(" %s", Red("err")))
-  }
-}
-
 // The `WriteMessage` function prints the message to the terminal. We
 // intrinsically have two different types of messages: messages with a prefix
 // and those without. If we have a prefix, we display the message type, which
@@ -88,22 +61,39 @@ func (w *DefaultWriter) FormatStatus(t StatusType, m *Message)  {
 // account.
 func (w *DefaultWriter) WriteMessage(m *Message) {
   var ll int = 1
-  var n int = w.MessageWidth
+  // var n int
+
+  n := w.MessageWidth + 9
+  if m.Type == PRINT { n = w.MessageWidth }
 
   fmsg := w.FormatMessage(m)
   rmsg := []rune(fmsg)
+
+  // For cleanliness, we clear the lines before we print. This way, if we are
+  // updating a log or if we are overwriting an existing log in the terminal,
+  // we will have a clean line to work with.
+  term.Clear()
 
   for i, r := range rmsg {
     fmt.Print(string(r))
     if i > 0 && (i + 1) % n == 0 {
       ll = ll + 1
-      n = w.MessageWidth - 8
+
       fmt.Print("\n")
-      if m.Type != PRINT { fmt.Print("        ") }
+      term.Clear()
+
+      if m.Type == PRINT {
+        n = n + w.MessageWidth
+      } else {
+        n = n + w.MessageWidth - 8
+        fmt.Print("        ")
+      }
     }
   }
 
+  // Set the line length based on the printed number of lines.
   m.lineLength = ll
+
 }
 
 // func (w *DefaultWriter) WriteMessage(m *Message) {

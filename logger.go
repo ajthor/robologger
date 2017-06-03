@@ -85,37 +85,42 @@ func (l *Logger) Find(arg interface{}) *Message {
 
   switch a := arg.(type) {
   case *Message:
+    // If we are passed a pointer to a message, we can confirm that the message
+    // is in the log.
     for _, m := range msgs {
       if a == m {
         return m
       }
     }
   case int:
+    // If we have a negative value, we need to return the difference between
+    // the history length and the value passed.
     if a < 0 {
-      a = a * -1
+      a = len(msgs) + a // (a * -1)
     }
 
-    if a >= len(msgs) {
-      return msgs[len(msgs) - 1]
-    } else {
-      return msgs[a]
+    // If the index is out of bounds, we return nil.
+    if a < 0 || a >= len(msgs) {
+      return nil
     }
+
+    // Otherwise, we return the message at the index.
+    return msgs[a]
+  default:
+    return nil
   }
 
   return nil
 }
 
 // The `Modify` function updates the log messages that have previously been printed to the log. By passing either a pointer to a message or an integer representing the index of the message,
-// it returns the number of lines from the bottom of the log to the start of the message, as well as the pointer to the message in the log. If no message matching the pointer to the message is found, the function returns zero and a nil pointer.
 func (l *Logger) Modify(arg interface{}) {
-  var offset int
+  var offset, index int
   var msg *Message
 
   msgs := l.history.messages
 
-  // Count the number of lines from the bottom of the log. We can either use
-  // the pointer to the message itself, or an integer representing the index of
-  // the message.
+  // Count the number of lines from the bottom of the log.
   switch a := arg.(type) {
   case *Message:
     offset = 0
@@ -123,16 +128,16 @@ func (l *Logger) Modify(arg interface{}) {
     for i := len(msgs) - 1; i >= 0; i-- {
       offset = offset + msgs[i].lineLength
       if a == msgs[i] {
-        // index = i
+        index = i
         break
       }
     }
   case int:
+    index = a
     for i := 0; i < len(msgs); i++ {
       offset = offset + msgs[i].lineLength
       if a == i {
         msg = msgs[i]
-        // index = i
         break
       }
     }
@@ -140,6 +145,9 @@ func (l *Logger) Modify(arg interface{}) {
     offset = 1
   }
 
+  // If we cannot find the message, we default to using the last message in the
+  // log. This way, we can still continue, even if the user passes an unknown
+  // value for the arguments.
   if msg == nil {
     offset = 1
   }
@@ -160,9 +168,8 @@ func (l *Logger) Modify(arg interface{}) {
   // to rewrite the log from here down, effectively adding a new line in the
   // middle of the log.
   if msg.lineLength > ll {
-    for i := 0; i < len(l.history.messages); i++ {
+    for i := index + 1; i < len(l.history.messages); i++ {
       l.Writer.WriteMessage(l.history.messages[i])
-      fmt.Print("\n")
     }
   }
 
