@@ -1,0 +1,6 @@
+hash: 0066d43d26866a3e1201364afb30f616376529a49cc0e39774d1e5f2d9d58056
+updated: 2017-06-01T09:35:03.331569602Z
+imports:
+- name: github.com/logrusorgru/aurora
+  version: 962a6974312dde57d1f6f5738b4f83e1af9f38a4
+testImports: []
