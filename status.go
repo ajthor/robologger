@@ -11,7 +11,6 @@ type StatusType int
 const (
   WAITING StatusType = iota
   OK
-  DONE
   ERR
 )
 
@@ -23,8 +22,6 @@ func (w *DefaultWriter) FormatStatus(arg interface{}) string {
       return fmt.Sprintf(" %s", Gray("waiting"))
     case OK:
       return fmt.Sprintf(" %s", Green("ok"))
-    case DONE:
-      return fmt.Sprintf(" %s", Green("done"))
     case ERR:
       return fmt.Sprintf(" %s", Red("err"))
     }
@@ -40,7 +37,7 @@ func (w *DefaultWriter) FormatProgress(progress int, arg interface{}) string {
   var percent int
 
   // The width is the width of the progress bar.
-  width := 40
+  width := w.MessageWidth - 40
   // 21 is the width of all of the characters in the progress bar that are not
   // inclusive of the status. This allows for the color codes necessary to
   // print the progress bar in the nice color we have.
