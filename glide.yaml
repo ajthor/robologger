@@ -1,3 +1,0 @@
-package: github.com/gorobot/robologger
-import:
-- package: github.com/logrusorgru/aurora
